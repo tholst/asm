@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:   "skills",
 	Short: "Agent Skills Manager — sync AI agent skills across machines",
@@ -21,6 +23,7 @@ Get started:
 }
 
 func main() {
+	rootCmd.Version = version
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
