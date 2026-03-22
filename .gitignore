@@ -1,0 +1,12 @@
+# Built binaries (at repo root)
+/skills
+/skills-sync
+/asm
+/dist/
+
+# macOS
+.DS_Store
+
+# Go test artifacts
+*.test
+*.out
