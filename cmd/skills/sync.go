@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tholst/asm/internal/agent"
@@ -30,6 +31,8 @@ var syncCmd = &cobra.Command{
 }
 
 func runSync(_ *cobra.Command, _ []string) error {
+	fmt.Printf("--- sync %s ---\n", time.Now().Format("2006-01-02 15:04:05"))
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
