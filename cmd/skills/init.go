@@ -219,11 +219,8 @@ func scaffoldRepo(repoPath string) error {
 			return fmt.Errorf("writing README: %w", err)
 		}
 	}
-	gitignorePath := filepath.Join(repoPath, ".gitignore")
-	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
-		if err := os.WriteFile(gitignorePath, []byte(".DS_Store\n"), 0644); err != nil {
-			return fmt.Errorf("writing .gitignore: %w", err)
-		}
+	if err := ensureGitignore(repoPath); err != nil {
+		return err
 	}
 	if err := git.CommitAll(repoPath, "feat: initialize skills repository"); err != nil {
 		fmt.Printf("Warning: initial commit failed (repo may be empty): %v\n", err)

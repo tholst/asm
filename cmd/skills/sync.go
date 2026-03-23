@@ -57,6 +57,11 @@ func runSync(_ *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Ensure .gitignore has required entries (e.g. .system/)
+	if err := ensureGitignore(cfg.RepoPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not update .gitignore: %v\n", err)
+	}
+
 	// Step 2: Commit local changes
 	changed, err := git.HasUncommittedChanges(cfg.RepoPath)
 	if err != nil {
