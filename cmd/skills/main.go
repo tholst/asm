@@ -19,7 +19,8 @@ Get started:
   skills init     First-time setup on this machine
   skills sync     Pull latest skills and push local changes
   skills status   Show sync status and agent link state
-  skills list     List all skills in the central repository`,
+  skills list     List all skills in the central repository
+  skills cron     Manage automatic sync schedule`,
 }
 
 func main() {

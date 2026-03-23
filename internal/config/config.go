@@ -8,12 +8,24 @@ import (
 	"strings"
 )
 
+// DefaultCronInterval is the default sync interval in minutes.
+const DefaultCronInterval = 30
+
 // Config holds the settings for the skills manager.
 type Config struct {
-	RepoPath    string   `json:"repo_path"`
-	RemoteURL   string   `json:"remote_url"`
-	Agents      []string `json:"agents"`
-	SyncOnStart bool     `json:"sync_on_start"`
+	RepoPath     string   `json:"repo_path"`
+	RemoteURL    string   `json:"remote_url"`
+	Agents       []string `json:"agents"`
+	SyncOnStart  bool     `json:"sync_on_start"`
+	CronInterval int      `json:"cron_interval,omitempty"`
+}
+
+// EffectiveCronInterval returns the configured interval or the default.
+func (c *Config) EffectiveCronInterval() int {
+	if c.CronInterval <= 0 {
+		return DefaultCronInterval
+	}
+	return c.CronInterval
 }
 
 // DefaultRepoPath returns the default local repo path (~/.skills-repo).

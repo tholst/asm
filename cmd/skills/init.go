@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/tholst/asm/internal/agent"
@@ -193,12 +190,11 @@ func runInit(_ *cobra.Command, _ []string) error {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 		fmt.Println()
 		if promptYN("Set up automatic sync every 30 minutes (via cron)?", true) {
-			if err := installCronEntry(); err != nil {
+			if err := installCron(cfg.EffectiveCronInterval()); err != nil {
 				fmt.Printf("Warning: could not install cron entry: %v\n", err)
-				fmt.Println("Add manually:")
-				fmt.Println("  */30 * * * * /usr/local/bin/skills sync >> ~/.config/skills/sync.log 2>&1")
+				fmt.Println("You can set it up later with: skills cron enable")
 			} else {
-				fmt.Println("Cron entry installed.")
+				fmt.Println("Cron entry installed. Manage with: skills cron status")
 			}
 		}
 	}
@@ -228,34 +224,3 @@ func scaffoldRepo(repoPath string) error {
 	return nil
 }
 
-func installCronEntry() error {
-	cronLine := "*/30 * * * * /usr/local/bin/skills sync >> ~/.config/skills/sync.log 2>&1"
-
-	// Read existing crontab
-	listCmd := exec.Command("crontab", "-l")
-	var listOut, listErr bytes.Buffer
-	listCmd.Stdout = &listOut
-	listCmd.Stderr = &listErr
-	existing := ""
-	if err := listCmd.Run(); err == nil {
-		existing = listOut.String()
-	}
-
-	if strings.Contains(existing, "skills sync") {
-		fmt.Println("  Cron entry already exists, skipping.")
-		return nil
-	}
-
-	newCrontab := existing
-	if len(newCrontab) > 0 && newCrontab[len(newCrontab)-1] != '\n' {
-		newCrontab += "\n"
-	}
-	newCrontab += cronLine + "\n"
-
-	// Write new crontab
-	writeCmd := exec.Command("crontab", "-")
-	writeCmd.Stdin = strings.NewReader(newCrontab)
-	writeCmd.Stdout = os.Stdout
-	writeCmd.Stderr = os.Stderr
-	return writeCmd.Run()
-}
