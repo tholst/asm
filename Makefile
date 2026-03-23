@@ -3,13 +3,17 @@ CMD        := ./cmd/skills
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS    := -ldflags "-X main.version=$(VERSION)"
 
-.PHONY: build clean install test lint release-patch release-minor release-major _check-clean
+.PHONY: build clean install update test lint release-patch release-minor release-major _check-clean
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) $(CMD)
 
 install:
 	go install $(LDFLAGS) $(CMD)
+
+update:
+	git pull --rebase
+	$(MAKE) install
 
 test:
 	go test ./...
