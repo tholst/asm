@@ -22,6 +22,7 @@ clean:
 
 _check-clean:
 	@git diff --quiet && git diff --cached --quiet || (echo "Error: uncommitted changes — commit or stash first"; exit 1)
+	@git fetch --tags
 
 release-patch: _check-clean
 	@current=$$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"); \
