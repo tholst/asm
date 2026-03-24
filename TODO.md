@@ -18,12 +18,13 @@
 - [ ] **`skills update`** — Pull latest version of an installed remote skill
 - [ ] **Skill templates** — `skills add --template` to scaffold a new skill with boilerplate SKILL.md
 - [ ] **Skill dependencies** — Allow skills to declare dependencies on other skills
+- [ ] **Shared hooks / non-skill assets** — Decide whether ASM should also manage agent hooks, prompt templates, or other versioned AI assets beyond `skills/`
 
 ## Sync & Git
 
 - [ ] **Conflict resolution UI** — Interactive conflict resolution instead of just aborting rebase
 - [ ] **Multi-branch support** — Use branches for experimental skills, merge when ready
-- [ ] **Selective sync** — Allow per-agent or per-machine skill filtering (not all skills on all machines)
+- [ ] **Selective sync** — Allow per-agent or per-machine skill filtering so different agents or machines can receive different subsets of skills
 - [ ] **Auto-create GitHub repo** — Offer to create a remote repo during `skills init` via `gh`
 
 ## Platform & Distribution
@@ -40,6 +41,9 @@
 - [ ] **Richer `skills list`** — Show skill metadata (author, tags, last modified)
 - [ ] **Dry-run mode** — `skills sync --dry-run` to preview what would happen
 - [ ] **Colored output** — Use ANSI colors for status, warnings, errors
+- [ ] **`skills guide` / explain commands** — Add in-tool workflow explanations for concepts like global repo vs agent symlinks and how to migrate/import/link correctly
+- [ ] **Configurable agent paths** — Allow overriding default global skill directories for agents instead of assuming only `~/.claude/skills`, `~/.cursor/skills`, and `~/.codex/skills`
+- [ ] **Cursor rules management** — Decide whether ASM should manage a shared Cursor ruleset and link it into repo-local `.cursor/rules` across repositories
 
 ## Multi-User / Team
 
