@@ -46,6 +46,7 @@ skills sync    # Pull latest and push local changes
 | `skills remove <name>` | Remove a skill from the central repo and commit |
 | `skills link` | (Re)create symlinks for all detected agents |
 | `skills unlink` | Remove symlinks and restore any backed-up original folders |
+| `skills cron doctor [--fix]` | Check cron health and optionally repair stale `skills` binary paths |
 
 ## Skill format
 
@@ -95,11 +96,13 @@ Sync logs are written to `~/.config/skills/sync.log`.
 
 ## Automatic sync (cron)
 
-`skills init` offers to install a cron entry that syncs every 30 minutes:
+`skills init` offers to install a cron entry that syncs every 30 minutes using the current `skills` binary path:
 
 ```cron
-*/30 * * * * /usr/local/bin/skills sync >> ~/.config/skills/sync.log 2>&1
+*/30 * * * * /path/to/current/skills sync >> ~/.config/skills/sync.log 2>&1
 ```
+
+If the `skills` binary moves later, run `skills cron doctor` to check the entry or `skills cron doctor --fix` to repair it.
 
 ## Platform support
 

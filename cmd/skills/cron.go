@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,12 +19,14 @@ import (
 func init() {
 	rootCmd.AddCommand(cronCmd)
 	cronCmd.AddCommand(cronStatusCmd)
+	cronCmd.AddCommand(cronDoctorCmd)
 	cronCmd.AddCommand(cronEnableCmd)
 	cronCmd.AddCommand(cronDisableCmd)
 	cronCmd.AddCommand(cronIntervalCmd)
 	cronCmd.AddCommand(cronLogsCmd)
 	cronLogsCmd.Flags().IntP("lines", "n", 20, "Number of log lines to show")
 	cronLogsCmd.Flags().BoolP("follow", "f", false, "Follow log output (tail -f)")
+	cronDoctorCmd.Flags().Bool("fix", false, "Rewrite the cron entry to use the current skills binary path")
 }
 
 var cronCmd = &cobra.Command{
@@ -59,6 +62,7 @@ func runCronStatus(_ *cobra.Command, _ []string) error {
 	fmt.Printf("Cron:      enabled (every %d minutes)\n", interval)
 	fmt.Printf("Schedule:  %s\n", cronScheduleFromLine(line))
 	fmt.Printf("Log file:  %s\n", config.CollapseHome(config.LogFilePath()))
+	printCronHealth(line)
 
 	logPath := config.LogFilePath()
 	if info, err := os.Stat(logPath); err == nil {
@@ -76,6 +80,60 @@ func runCronStatus(_ *cobra.Command, _ []string) error {
 		fmt.Println("Last sync: no log file found")
 	}
 
+	return nil
+}
+
+// --- doctor ---
+
+var cronDoctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Check cron entry health and optionally repair it",
+	RunE:  runCronDoctor,
+}
+
+func runCronDoctor(cmd *cobra.Command, _ []string) error {
+	if err := requireCronPlatform(); err != nil {
+		return err
+	}
+
+	crontab, _ := getCrontab()
+	line, found := findSkillsCronLine(crontab)
+	if !found {
+		fmt.Println("Cron:      not installed")
+		fmt.Println()
+		fmt.Println("Enable with: skills cron enable")
+		return nil
+	}
+
+	printCronHealth(line)
+
+	fix, _ := cmd.Flags().GetBool("fix")
+	health := inspectCronLine(line)
+	if health.Healthy && !health.RepairRecommended {
+		if fix {
+			fmt.Println("Cron entry is already healthy. No changes made.")
+		}
+		return nil
+	}
+
+	if !fix {
+		fmt.Println()
+		if health.Healthy {
+			fmt.Println("Rewrite with: skills cron doctor --fix")
+		} else {
+			fmt.Println("Repair with: skills cron doctor --fix")
+		}
+		return nil
+	}
+
+	newCrontab := removeCronLines(crontab)
+	newCrontab = appendCronLine(newCrontab, parseIntervalFromCronLine(line))
+	if err := writeCrontab(newCrontab); err != nil {
+		return fmt.Errorf("writing crontab: %w", err)
+	}
+
+	fmt.Println("Cron entry repaired.")
+	fmt.Printf("New entry:  %s\n", buildCronLine(parseIntervalFromCronLine(line)))
 	return nil
 }
 
@@ -275,17 +333,124 @@ func cronScheduleFromLine(line string) string {
 	return line
 }
 
+type cronHealth struct {
+	Healthy           bool
+	RepairRecommended bool
+	InstalledPath     string
+	ExpectedPath      string
+	Problems          []string
+	Notes             []string
+}
+
+var resolveSkillsBinaryPath = skillsBinaryPath
+
+func inspectCronLine(line string) cronHealth {
+	health := cronHealth{
+		Healthy:      true,
+		ExpectedPath: resolveSkillsBinaryPath(),
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 7 {
+		health.Healthy = false
+		health.Problems = append(health.Problems, "entry format is not recognized")
+		return health
+	}
+
+	health.InstalledPath = fields[5]
+	if fields[6] != "sync" {
+		health.Healthy = false
+		health.Problems = append(health.Problems, "entry does not invoke 'skills sync'")
+	}
+
+	if _, err := os.Stat(health.InstalledPath); err != nil {
+		health.Healthy = false
+		health.Problems = append(health.Problems, fmt.Sprintf("binary missing: %s", health.InstalledPath))
+	}
+
+	if health.InstalledPath != health.ExpectedPath && !isEphemeralGoRunBinary(health.ExpectedPath) {
+		health.RepairRecommended = true
+		health.Notes = append(health.Notes, fmt.Sprintf("entry points to %s, current binary is %s", health.InstalledPath, health.ExpectedPath))
+	}
+
+	return health
+}
+
+func printCronHealth(line string) {
+	health := inspectCronLine(line)
+	if health.Healthy {
+		if health.RepairRecommended {
+			fmt.Println("Health:    ok (rewrite recommended)")
+		} else {
+			fmt.Println("Health:    ok")
+		}
+		for _, note := range health.Notes {
+			fmt.Printf("Note:      %s\n", note)
+		}
+		return
+	}
+
+	fmt.Println("Health:    needs repair")
+	for _, problem := range health.Problems {
+		fmt.Printf("Problem:   %s\n", problem)
+	}
+	for _, note := range health.Notes {
+		fmt.Printf("Note:      %s\n", note)
+	}
+}
+
 func buildCronLine(intervalMinutes int) string {
-	binary := skillsBinaryPath()
+	binary := resolveSkillsBinaryPath()
 	logPath := config.LogFilePath()
 	return fmt.Sprintf("*/%d * * * * %s sync >> %s 2>&1", intervalMinutes, binary, logPath)
 }
 
 func skillsBinaryPath() string {
 	if exe, err := os.Executable(); err == nil && exe != "" {
+		if isEphemeralGoRunBinary(exe) {
+			if path := findStableSkillsBinaryOnPath(); path != "" {
+				return path
+			}
+		}
 		return exe
 	}
+	if path := findStableSkillsBinaryOnPath(); path != "" {
+		return path
+	}
 	return "/usr/local/bin/skills"
+}
+
+func isEphemeralGoRunBinary(path string) bool {
+	base := filepath.Base(path)
+	if base != "skills" {
+		return false
+	}
+	if strings.Contains(path, string(os.PathSeparator)+"go-build") {
+		return true
+	}
+	tempDir := os.TempDir()
+	return strings.HasPrefix(path, tempDir+string(os.PathSeparator))
+}
+
+func findStableSkillsBinaryOnPath() string {
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, "skills")
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		if info.Mode()&0111 == 0 {
+			continue
+		}
+		if isEphemeralGoRunBinary(candidate) {
+			continue
+		}
+		return candidate
+	}
+	return ""
 }
 
 func removeCronLines(crontab string) string {
@@ -322,8 +487,18 @@ func writeCrontab(content string) error {
 // installCron adds the cron entry if not already present. Used by both init and cron enable.
 func installCron(intervalMinutes int) error {
 	crontab, _ := getCrontab()
-	if _, found := findSkillsCronLine(crontab); found {
-		fmt.Println("Cron entry already exists, skipping.")
+	if line, found := findSkillsCronLine(crontab); found {
+		if inspectCronLine(line).Healthy {
+			fmt.Println("Cron entry already exists, skipping.")
+			return nil
+		}
+
+		newCrontab := removeCronLines(crontab)
+		newCrontab = appendCronLine(newCrontab, intervalMinutes)
+		if err := writeCrontab(newCrontab); err != nil {
+			return err
+		}
+		fmt.Println("Repaired existing cron entry.")
 		return nil
 	}
 	newCrontab := appendCronLine(crontab, intervalMinutes)

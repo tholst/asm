@@ -195,13 +195,13 @@ The user then resolves the conflict manually and runs `skills sync` again.
 
 ## Cron Integration
 
-`skills init` offers to install a cron entry automatically:
+`skills init` offers to install a cron entry automatically using the current `skills` binary path:
 
 ```cron
-*/30 * * * * /usr/local/bin/skills sync >> ~/.config/skills/sync.log 2>&1
+*/30 * * * * /path/to/current/skills sync >> ~/.config/skills/sync.log 2>&1
 ```
 
-The user can adjust the interval or disable it at any time.
+The user can adjust the interval or disable it at any time, and `skills cron doctor --fix` can repair stale paths if the binary later moves.
 
 ---
 
